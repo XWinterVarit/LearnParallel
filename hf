@@ -1,0 +1,3 @@
+dockeropenmpi_mpi_node_1 : 2
+dockeropenmpi_mpi_node_2 : 2
+dockeropenmpi_mpi_node_3 : 2
