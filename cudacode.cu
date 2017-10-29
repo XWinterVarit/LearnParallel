@@ -1,43 +1,57 @@
-// This is the REAL "hello world" for CUDA!
-// It takes the string "Hello ", prints it, then passes it to CUDA with an array
-// of offsets. Then the offsets are added in parallel to produce the string "World!"
-// By Ingemar Ragnemalm 2010
+#include "stdio.h"
+#include "stdlib.h"
 
-#include <stdio.h>
-
-const int N = 16;
-const int blocksize = 16;
-
-__global__
-void hello(char *a, int *b)
+__global__ void VecAdd(float* A, float* B, float* C, int N)
 {
-    a[threadIdx.x] += b[threadIdx.x];
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < N)
+        C[i] = A[i] + B[i];
 }
-
+void array_print(float* array, int size) {
+    for (int i = 0; i < size; i++) {
+        printf("%f ", *(array+i));
+    }
+    printf("\n");
+}
 int main()
 {
-    char a[N] = "Hello \0\0\0\0\0\0";
-    int b[N] = {15, 10, 6, 0, -11, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    int N = 3;
+    size_t size = N * sizeof(float);
+    float* h_A = (float*)malloc(size);
+    float* h_B = (float*)malloc(size);
+    float* h_C = (float*)malloc(size);
 
-    char *ad;
-    int *bd;
-    const int csize = N*sizeof(char);
-    const int isize = N*sizeof(int);
+    *(h_A) = 2;
+    *(h_A+1) = 4;
+    *(h_A+2) = 6;
 
-    printf("%s", a);
+    *(h_B) = 2;
+    *(h_B+1) = 4;
+    *(h_B+2) = 6;
 
-    cudaMalloc( (void**)&ad, csize );
-    cudaMalloc( (void**)&bd, isize );
-    cudaMemcpy( ad, a, csize, cudaMemcpyHostToDevice );
-    cudaMemcpy( bd, b, isize, cudaMemcpyHostToDevice );
+    float* d_A;
+    cudaMalloc(&d_A, size);
+    float* d_B;
+    cudaMalloc(&d_B, size);
+    float* d_C;
+    cudaMalloc(&d_C, size);
 
-    dim3 dimBlock( blocksize, 1 );
-    dim3 dimGrid( 1, 1 );
-    hello<<<dimGrid, dimBlock>>>(ad, bd);
-    cudaMemcpy( a, ad, csize, cudaMemcpyDeviceToHost );
-    cudaFree( ad );
-    cudaFree( bd );
+    cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
 
-    printf("%s\n", a);
-    return EXIT_SUCCESS;
+    int threadPerBlock = 1024;
+    int blockPerGrid = (N + threadPerBlock - 1) / threadPerBlock;
+    VecAdd<<<blockPerGrid, threadPerBlock>>>(d_A,d_B,d_C, N);
+
+    cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
+    // Free device memory
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+
+
+
+    array_print(h_A,3);
+    array_print(h_B,3);
+    array_print(h_C,3);
 }
