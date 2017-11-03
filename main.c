@@ -7,7 +7,7 @@
 int NUM_THREADS = 4;
 char FileName[] = "01all.nt";
 char DefineWord[] = "<http://www.w3.org/2001/XMLSchema#string>";
-long threadchucksize = 10000; // Warning : Must larger than one word, if not, infinity loop begin!
+long threadchucksize = 100000; // Warning : Must larger than one word, if not, infinity loop begin!
 char RunningThreads[8];
 int WordCount;
 pthread_mutex_t lock_WordCount;
