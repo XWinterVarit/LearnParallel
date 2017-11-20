@@ -4,12 +4,50 @@
 #include <pthread.h>
 
 int NUM_THREADS = 4;
-char FileName[] = "a.txt";
+char FileName[] = "01.nt";
+char QuestionFileName[] = "q.txt";
 char OutputFileName[] = "b.txt";
-char DefineWord[] = "Cat";
-long threadchucksize = 10; // Warning : Must larger than one word, if not, infinity loop begin!
+char DefineWord[] = "<http://psi.oasis-open.org/iso/639/#ast>";
+long threadchucksize = 100000000; // Warning : Must larger than one word, if not, infinity loop begin!
 char RunningThreads[8];
 int WordCount;
+
+
+int d_strncmp(const char *ptr0, const char *ptr1, size_t len)
+{
+    int fast = len/sizeof(size_t) + 1;
+    int offset = (fast-1)*sizeof(size_t);
+    int current_block = 0;
+
+    if( len <= sizeof(size_t)){ fast = 0; }
+
+
+    size_t *lptr0 = (size_t*)ptr0;
+    size_t *lptr1 = (size_t*)ptr1;
+
+    while( current_block < fast ){
+        if( (lptr0[current_block] ^ lptr1[current_block] )){
+            int pos;
+            for(pos = current_block*sizeof(size_t); pos < len ; ++pos ){
+                if( (ptr0[pos] ^ ptr1[pos]) || (ptr0[pos] == 0) || (ptr1[pos] == 0) ){
+                    return  (int)((unsigned char)ptr0[pos] - (unsigned char)ptr1[pos]);
+                }
+            }
+        }
+
+        ++current_block;
+    }
+
+    while( len > offset ){
+        if( (ptr0[offset] ^ ptr1[offset] )){
+            return (int)((unsigned char)ptr0[offset] - (unsigned char)ptr1[offset]);
+        }
+        ++offset;
+    }
+
+
+    return 0;
+}
 
 unsigned int string_search(long start, long end, char* target, char *buffer) {
     unsigned int i;
@@ -20,15 +58,18 @@ unsigned int string_search(long start, long end, char* target, char *buffer) {
     //    printf("%c", *(buffer+i));
     //printf("\n");
     for (i=start;i <= end; i++)
-        if (strncmp(&buffer[i],target,strlen(target))==0) {
+        if (d_strncmp(&buffer[i],target,strlen(target))==0) {
             //if (i <= overflowRegion)
-                found++;
+            found++;
         }
     //printf("overflowRegion : %d\n", overflowRegion);
     //printf("Receiveing Found : %d\n", found);
     return found;
 }
+
+
 unsigned int string_search_rr(long start, long end, char* target, char *buffer,int overflowStringSize, char options) {
+
     unsigned int i;
     unsigned int found=0;
     //printf("Receiveing : target : %s  buffer : %s\n", target, buffer);
@@ -37,21 +78,47 @@ unsigned int string_search_rr(long start, long end, char* target, char *buffer,i
     //    printf("%c", *(buffer+i));
     //printf("\n");
     for (i=start;i <= end; i++)
-        if (strncmp(&buffer[i],target,strlen(target))==0) {
+        if (d_strncmp(&buffer[i],target,strlen(target))==0) {
             //if (i <= overflowRegion)
             found++;
-            //*(buffer+i) = '$';
-
-            for (int j = i; j < i + overflowStringSize ; j++) {
-                *(buffer+j) = '$';
-            }
         }
     //printf("overflowRegion : %d\n", overflowRegion);
     //printf("Receiveing Found : %d\n", found);
     return found;
+
+
+
+
+/*
+    int found = 0;
+    for (long i = start; i < end +1 ; i++) {
+        int charfail = 0;
+        int wordindex = 0;
+        //printf("show string : str1 : %c     word :  \n", *(buffer+i));
+
+
+        for (int j = i; j < i + overflowStringSize && j < end + 1; ++j) {
+            //printf("show string : str1 : %c     word : %c \n", *(buffer+j), *(target+wordindex));
+
+            if (*(buffer+j) != *(target+wordindex))
+                charfail = 1;
+
+            wordindex++;
+        }
+
+        if (charfail == 0)
+            found++;
+        //printf("cal found : %d\n", found);
+        //printf("----\n");
+
+    }
+    //printf("overflowRegion : %d\n", overflowRegion);
+    //printf("Receiveing Found : %d\n", found);
+    return found;
+    */
 }
 void cuda_stringsearch (long bufferstart, long bufferend, char* target, char* buffer, int* allcount, int overflowStringSize, int fakeindex) {
-    long blocksize = 5;
+    long blocksize = 100000;
     long extendblocksize = blocksize + overflowStringSize - 2;
     int index = fakeindex;
     long startpoint = index * blocksize;
@@ -64,12 +131,13 @@ void cuda_stringsearch (long bufferstart, long bufferend, char* target, char* bu
         *allcount += count;
         printf("*******************************************************************************************************************\n");
         printf("Hello from fake threads : %d   startpoint : %ld   logical_endpoint : %ld    sending_endpoint : %ld    bufferend : %ld count : %d \n", index, startpoint, startpoint + extendblocksize, endpoint, bufferend, count);
-
+/*
         for (int i = startpoint; i <= startpoint + extendblocksize ; ++i) {
             printf("%c", *(buffer+i));
         }
 
         printf("||\n");
+        */
     }
 
 }
@@ -92,7 +160,16 @@ int main(int argc, char **argv) {
     int overflowStringSize = sizeof(DefineWord)/ sizeof(char) - 1;
     printf("Overflow String size : %d\n", overflowStringSize);
 
-
+    FILE * questionFile;
+    long questionFile_lSize;
+    questionFile = fopen(QuestionFileName, "r");
+    if (questionFile == NULL) {fputs ("File error", stderr); exit(1);}
+    fseek(questionFile, 0, SEEK_END);
+    lSize = ftell(questionFile);
+    rewind(questionFile);
+    long QuestionBufferSize = sizeof(char)*lSize;
+    printf("Question Buffer index size %lu \n", BufferSize);
+    
 
     FILE * outputFile;
     long lSize2;
@@ -138,11 +215,12 @@ int main(int argc, char **argv) {
         for (int i = 0; i < 1000; ++i) {
             cuda_stringsearch(startpoint, endpoint, DefineWord, buffer, countPTR, overflowStringSize, i);
         }
-        printf("---------Buffer after changed----------------------------------------------------------------\n");
+   /*
+        //printf("---------Buffer after changed----------------------------------------------------------------\n");
         endpoint = threadchucksize - 1;
         if (endpoint > BufferSize)
             endpoint = BufferSize;
-        printf("startpoint : %ld     endpoint : %ld   BufferSize : %ld \n", startpoint, endpoint, BufferSize);
+        //printf("startpoint : %ld     endpoint : %ld   BufferSize : %ld \n", startpoint, endpoint, BufferSize);
         //if (startpoint != endpoint) {
             for (int i=startpoint;i <= endpoint; i++) {
                 printf("%c", *(buffer + i));
@@ -152,7 +230,7 @@ int main(int argc, char **argv) {
             printf("\n");
         //}
         printf("-------------------------------------------------------------------------------------------\n");
-
+*/
         //fprintf(outputFile, "%s",buffer);
         BufferSize = BufferSize - threadchucksize;
 
@@ -163,5 +241,5 @@ int main(int argc, char **argv) {
     printf("all count : %d \n", *countPTR);
     fclose (pFile);
     fclose (outputFile);
-    return EXIT_SUCCESS;
+    return 0;
 }
