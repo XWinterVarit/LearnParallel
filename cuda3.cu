@@ -111,56 +111,19 @@ __device__ unsigned int string_search(long start, long end, char* target, char *
     return found;
 }
 __device__ unsigned int string_search_rr(long start, long end, char* target, char *buffer,int overflowStringSize, char options) {
-    //printf("Receiveing : target : %s  buffer : %s\n", target, buffer);
-    //printf("My Buffer: ");
-    //for (i=start;i <= end; i++)
-    //    printf("%c", *(buffer+i));
-    //printf("\n");
-/*
-    int found = 0;
-    for (long i = start; i < end +1 ; i++) {
-        int charfail = 0;
-        int wordindex = 0;
-        //printf("show string : str1 : %c     word :  \n", *(buffer+i));
-        for (int j = i; j < i + overflowStringSize && j < end + 1; ++j) {
-            //printf("show string : str1 : %c     word : %c \n", *(buffer+j), *(target+wordindex));
-
-            if (*(buffer+j) != *(target+wordindex))
-                charfail = 1;
-
-            wordindex++;
-        }
-
-        if (charfail == 0)
-            found++;
-        //printf("cal found : %d\n", found);
-        //printf("----\n");
-
-    }
-    //printf("overflowRegion : %d\n", overflowRegion);
-    //printf("Receiveing Found : %d\n", found);
-    return found;
-    */
-
 
     unsigned int i;
     unsigned int found=0;
-    //printf("Receiveing : target : %s  buffer : %s\n", target, buffer);
-    //printf("My Buffer: ");
-    //for (i=start;i <= end; i++)
-    //    printf("%c", *(buffer+i));
-    //printf("\n");
+
     for (i=start;i <= end  ; i++) {
         int t = d_strncmp(&buffer[i], target, d_strlen(target));
-        //printf("t dkmfdsfdfdspfdsfpodsfjkdpsof: %d \n", t);
         if (t == 0 ) {
             //if (i <= overflowRegion)
             found++;
         }
 
     }
-    //printf("overflowRegion : %d\n", overflowRegion);
-    //printf("Receiveing Found : %d\n", found);
+
     return found;
 }
 __global__ void cuda_stringsearch (long bufferstart, long bufferend, char* target, char* buffer, int* allcount, int overflowStringSize, long *answerVector) {
@@ -222,7 +185,53 @@ int main(int argc, char **argv) {
     int reverseoffset = 0;
     /* create threads */
     long endpoint = 0,startpoint = 0;
-    int overflowStringSize = sizeof(DefineWord)/ sizeof(char) - 1;
+
+
+
+
+    FILE * questionFile;
+    long lSizeQ;
+    questionFile = fopen(QuestionFileName, "r");
+    if (questionFile == NULL) {fputs ("File error", stderr); exit(1);}
+    fseek(questionFile, 0, SEEK_END);
+    lSizeQ = ftell(questionFile);
+    rewind(questionFile);
+    long QuestionBufferSize = sizeof(char)*lSizeQ;
+    printf("Question Buffer index size %lu \n", QuestionBufferSize);
+    char *Question_Buffer = (char*) malloc (lSizeQ);
+    fread(Question_Buffer, 1, QuestionBufferSize, questionFile);
+    printf("This is question file --------\n");
+
+    //printf("%s\n", Question_Buffer);
+
+    long start = 0, end = 0;
+    int Question_maxLength = 0;
+    char** questionArray = (char**) malloc(sizeof(char*)*2048);
+    long** questionAnswer = (long**) malloc(sizeof(long*)*2048);
+
+    int questionCount = 0;
+    for (int j = 0; j <= strlen(Question_Buffer); ++j) {
+        end++;
+        if (*(Question_Buffer+j) == '\n' || *(Question_Buffer+j) == '\0') {
+            questionCount++;
+            //piece = (char*) malloc(sizeof(char)*2048);
+            //memcpy(piece, (Question_Buffer+start), end - start - 1);
+            *(questionArray+questionCount) = (char*) malloc(sizeof(char)*2048);
+            memcpy(*(questionArray+questionCount), (Question_Buffer+start), end - start - 1);
+            if (strlen(*(questionArray+questionCount)) > Question_maxLength)
+                Question_maxLength = strlen(*(questionArray+questionCount));
+            //printf("print piece %s|||\n", *(questionArray+questionCount));
+            //printf("piece length : %lu \n", strlen(*(questionArray+questionCount)));
+            start = end;
+
+        }
+    }
+    printf("Question max length : %d\n", Question_maxLength);
+    printf("Question elements count : %d\n", questionCount);
+    free(Question_Buffer);
+    printf("This is question file --------\n");
+
+    int overflowStringSize = Question_maxLength /*- 1*/;
     printf("Overflow String size : %d\n", overflowStringSize);
 
 
@@ -255,8 +264,6 @@ int main(int argc, char **argv) {
         //printf("%s||| count : %d\n", buffer, count);
         //printf("-------\n");
 
-        long size_answerVector = 4096;
-        long* answerVector = createVector(size_answerVector,0);
 
 
 
@@ -267,14 +274,25 @@ int main(int argc, char **argv) {
 
         cudaMalloc((void**)&dev_buffer, sizeof(char)*(threadchucksize + overflowStringSize));
         cudaMalloc((void**)&dev_countPTR, sizeof(int));
-        cudaMalloc((void**)&dev_answerVector, sizeof(long)*size_answerVector);
-        cudaMalloc((void**)&dev_defineword, sizeof(DefineWord));
 
         cudaMemcpy(dev_buffer, buffer, sizeof(char)*(threadchucksize + overflowStringSize), cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_defineword, DefineWord, sizeof(DefineWord), cudaMemcpyHostToDevice);
         cudaMemcpy(dev_countPTR, countPTR, sizeof(int),cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_answerVector, answerVector, sizeof(long)*size_answerVector, cudaMemcpyHostToDevice);
-        cuda_stringsearch<<<4,1024>>>(startpoint, endpoint, dev_defineword, dev_buffer, dev_countPTR, overflowStringSize, dev_answerVector);
+
+        for (int question = 0; question < questionCount; ++question) {
+            long size_answerVector = 4096;
+            long* answerVector = createVector(size_answerVector,0);
+            cudaMalloc((void**)&dev_answerVector, sizeof(long)*size_answerVector);
+            cudaMalloc((void**)&dev_defineword, sizeof(DefineWord));
+
+            cudaMemcpy(dev_answerVector, answerVector, sizeof(long)*size_answerVector, cudaMemcpyHostToDevice);
+            cudaMemcpy(dev_defineword, *(questionArray+question), sizeof(*(questionArray+question)), cudaMemcpyHostToDevice);
+
+            cuda_stringsearch<<<4,1024>>>(startpoint, endpoint, dev_defineword, dev_buffer, dev_countPTR, overflowStringSize, dev_answerVector);
+
+
+        }
+
+
         gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
 

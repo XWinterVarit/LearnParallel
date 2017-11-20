@@ -4,13 +4,20 @@
 #include <pthread.h>
 
 int NUM_THREADS = 4;
-char FileName[] = "01.nt";
-char QuestionFileName[] = "q.txt";
+char FileName[] = "a.txt";
+char QuestionFileName[] = "line1";
 char OutputFileName[] = "b.txt";
-char DefineWord[] = "<http://psi.oasis-open.org/iso/639/#ast>";
-long threadchucksize = 100000000; // Warning : Must larger than one word, if not, infinity loop begin!
+char DefineWord[] = "Cat";
+long threadchucksize = 50; // Warning : Must larger than one word, if not, infinity loop begin!
 char RunningThreads[8];
 int WordCount;
+
+char* d_strcat( char* dest, char* src )
+{
+    while (*dest) dest++;
+    while (*dest++ == *src++);
+    return --dest;
+}
 
 
 int d_strncmp(const char *ptr0, const char *ptr1, size_t len)
@@ -81,6 +88,11 @@ unsigned int string_search_rr(long start, long end, char* target, char *buffer,i
         if (d_strncmp(&buffer[i],target,strlen(target))==0) {
             //if (i <= overflowRegion)
             found++;
+            //printf("found at i : %d\n", i);
+            for (int j = i; j < i + strlen(target); ++j) {
+                //printf("change at j : %d i : %d\n", j,i);
+                *(buffer+j) = '$';
+            }
         }
     //printf("overflowRegion : %d\n", overflowRegion);
     //printf("Receiveing Found : %d\n", found);
@@ -117,8 +129,8 @@ unsigned int string_search_rr(long start, long end, char* target, char *buffer,i
     return found;
     */
 }
-void cuda_stringsearch (long bufferstart, long bufferend, char* target, char* buffer, int* allcount, int overflowStringSize, int fakeindex) {
-    long blocksize = 100000;
+void cuda_stringsearch (long bufferstart, long bufferend, char* target, char* buffer, int* allcount, int overflowStringSize, int fakeindex /*,char* questionBuffer*/) {
+    long blocksize = 10;
     long extendblocksize = blocksize + overflowStringSize - 2;
     int index = fakeindex;
     long startpoint = index * blocksize;
@@ -161,15 +173,47 @@ int main(int argc, char **argv) {
     printf("Overflow String size : %d\n", overflowStringSize);
 
     FILE * questionFile;
-    long questionFile_lSize;
+    long lSizeQ;
     questionFile = fopen(QuestionFileName, "r");
     if (questionFile == NULL) {fputs ("File error", stderr); exit(1);}
     fseek(questionFile, 0, SEEK_END);
-    lSize = ftell(questionFile);
+    lSizeQ = ftell(questionFile);
     rewind(questionFile);
-    long QuestionBufferSize = sizeof(char)*lSize;
-    printf("Question Buffer index size %lu \n", BufferSize);
-    
+    long QuestionBufferSize = sizeof(char)*lSizeQ;
+    printf("Question Buffer index size %lu \n", QuestionBufferSize);
+    char *Question_Buffer = (char*) malloc (lSizeQ);
+    fread(Question_Buffer, 1, QuestionBufferSize, questionFile);
+    printf("This is question file --------\n");
+
+    //printf("%s\n", Question_Buffer);
+
+    long start = 0, end = 0;
+    int Question_maxLength = 0;
+    char** questionArray = (char**) malloc(sizeof(char*)*2048);
+    long** questionAnswer = (long**) malloc(sizeof(long*)*2048);
+
+    int questionCount = 0;
+    for (int j = 0; j <= strlen(Question_Buffer); ++j) {
+        end++;
+        if (*(Question_Buffer+j) == '\n' || *(Question_Buffer+j) == '\0') {
+            questionCount++;
+            //piece = (char*) malloc(sizeof(char)*2048);
+            //memcpy(piece, (Question_Buffer+start), end - start - 1);
+            *(questionArray+questionCount) = (char*) malloc(sizeof(char)*2048);
+            memcpy(*(questionArray+questionCount), (Question_Buffer+start), end - start - 1);
+            if (strlen(*(questionArray+questionCount)) > Question_maxLength)
+                Question_maxLength = strlen(*(questionArray+questionCount));
+            //printf("print piece %s|||\n", *(questionArray+questionCount));
+            //printf("piece length : %lu \n", strlen(*(questionArray+questionCount)));
+            start = end;
+
+        }
+    }
+    printf("Question max length : %d\n", Question_maxLength);
+    printf("Question elements count : %d\n", questionCount);
+    free(Question_Buffer);
+    printf("This is question file --------\n");
+
 
     FILE * outputFile;
     long lSize2;
@@ -215,7 +259,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < 1000; ++i) {
             cuda_stringsearch(startpoint, endpoint, DefineWord, buffer, countPTR, overflowStringSize, i);
         }
-   /*
+/*
         //printf("---------Buffer after changed----------------------------------------------------------------\n");
         endpoint = threadchucksize - 1;
         if (endpoint > BufferSize)
