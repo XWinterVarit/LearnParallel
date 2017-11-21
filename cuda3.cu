@@ -246,11 +246,11 @@ int main(int argc, char **argv) {
 
         }
     }
-
+/*
     for (int k = 1; k <= questionCount; ++k) {
         printf("element at : %d is : %s value is : %lu\n",  k, *(questionArray+k), *(questionAnswer+k));
     }
-
+*/
     printf("Question max length : %d\n", Question_maxLength);
     printf("Question elements count : %d\n", questionCount);
     free(Question_Buffer);
@@ -339,7 +339,7 @@ int main(int argc, char **argv) {
         //cudaMemcpy (countPTR, dev_countPTR, sizeof(int), cudaMemcpyDeviceToHost);
         cudaFree(dev_buffer); cudaFree(dev_countPTR);
 
-        printf("---------saveing change buffered----------------------------------------------------------------\n");
+        printf("---------saving change buffered----------------------------------------------------------------\n");
         endpoint = threadchucksize - 1;
         if (endpoint > BufferSize)
             endpoint = BufferSize;
