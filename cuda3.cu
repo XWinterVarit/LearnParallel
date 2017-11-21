@@ -20,12 +20,25 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     }
 }
 
-char FileName[] = "01.nt";
-char OutputFileName[] = "b.txt";
+const char FileName[] = "01.nt";
+const char OutputFileName[] = "b.txt";
+const char QuestionFileName[] = "q.txt";
 //char DefineWord[] = "http://www.w3.org/2001/XMLSchema#string";
-char DefineWord[] = "a";
+//char DefineWord[] = "a";
 
-long threadchucksize = 200000000; // aka file read buffer size 200 MB each
+const long threadchucksize = 100000000; // threadchucksize / blocksize "must" <= size of answer vector ,aka file read buffer size 200 MB each
+const long blocksize = 25000;
+
+const int sizeofQuestionArray = 2048;
+const int sizeofMaximumQuestionWord = 2048;
+
+const long sizeofAnswerVector = 4096; // number of blocks * thread per block
+const int NumberOfComputeBlock = 4;
+const int NumberOfThreadsPerBlock = 1024;
+
+
+
+
 int WordCount;
 __device__ size_t d_strlen (const char *str)
 {
@@ -120,6 +133,12 @@ __device__ unsigned int string_search_rr(long start, long end, char* target, cha
         if (t == 0 ) {
             //if (i <= overflowRegion)
             found++;
+
+            for (int j = i; j < i + d_strlen(target); ++j) {
+                //printf("change at j : %d i : %d\n", j,i);
+                *(buffer+j) = '$';
+            }
+
         }
 
     }
@@ -131,7 +150,7 @@ __global__ void cuda_stringsearch (long bufferstart, long bufferend, char* targe
     //printf("hello from thread %d\n", index);
     //printf("Hello from threads %d  Given word %s\n", index, target);
 
-    long blocksize = 50000;
+   // long blocksize = 500/*50000*/;
     long extendblocksize = blocksize + overflowStringSize - 2;
     long startpoint = index * blocksize;
     long endpoint = startpoint + blocksize  - 1;
@@ -206,8 +225,8 @@ int main(int argc, char **argv) {
 
     long start = 0, end = 0;
     int Question_maxLength = 0;
-    char** questionArray = (char**) malloc(sizeof(char*)*2048);
-    long** questionAnswer = (long**) malloc(sizeof(long*)*2048);
+    char** questionArray = (char**) malloc(sizeof(char*)*sizeofQuestionArray);
+    long* questionAnswer = (long*) malloc(sizeof(long)*sizeofQuestionArray);
 
     int questionCount = 0;
     for (int j = 0; j <= strlen(Question_Buffer); ++j) {
@@ -216,8 +235,9 @@ int main(int argc, char **argv) {
             questionCount++;
             //piece = (char*) malloc(sizeof(char)*2048);
             //memcpy(piece, (Question_Buffer+start), end - start - 1);
-            *(questionArray+questionCount) = (char*) malloc(sizeof(char)*2048);
+            *(questionArray+questionCount) = (char*) malloc(sizeof(char)*sizeofAnswerVector);
             memcpy(*(questionArray+questionCount), (Question_Buffer+start), end - start - 1);
+            *(questionAnswer+questionCount) = 0/*(long) strlen(*(questionArray+questionCount))*/;
             if (strlen(*(questionArray+questionCount)) > Question_maxLength)
                 Question_maxLength = strlen(*(questionArray+questionCount));
             //printf("print piece %s|||\n", *(questionArray+questionCount));
@@ -226,6 +246,11 @@ int main(int argc, char **argv) {
 
         }
     }
+
+    for (int k = 1; k <= questionCount; ++k) {
+        printf("element at : %d is : %s value is : %lu\n",  k, *(questionArray+k), *(questionAnswer+k));
+    }
+
     printf("Question max length : %d\n", Question_maxLength);
     printf("Question elements count : %d\n", questionCount);
     free(Question_Buffer);
@@ -259,6 +284,7 @@ int main(int argc, char **argv) {
         if (BufferSize <= threadchucksize)
             endpoint = BufferSize;
         printf("This will send buffer start at %ld to %ld of all %ld\n", startpoint, endpoint, BufferSize);
+
         //int j = 0;
         //count += string_search(startpoint, endpoint, DefineWord, buffer);
         //printf("%s||| count : %d\n", buffer, count);
@@ -278,62 +304,66 @@ int main(int argc, char **argv) {
         cudaMemcpy(dev_buffer, buffer, sizeof(char)*(threadchucksize + overflowStringSize), cudaMemcpyHostToDevice);
         cudaMemcpy(dev_countPTR, countPTR, sizeof(int),cudaMemcpyHostToDevice);
 
-        for (int question = 0; question < questionCount; ++question) {
-            long size_answerVector = 4096;
+        for (int question = 1; question <= questionCount; ++question) {
+        //int question = 1;
+            long size_answerVector = sizeofAnswerVector;
             long* answerVector = createVector(size_answerVector,0);
             cudaMalloc((void**)&dev_answerVector, sizeof(long)*size_answerVector);
-            cudaMalloc((void**)&dev_defineword, sizeof(DefineWord));
+            cudaMalloc((void**)&dev_defineword, sizeof(*(questionArray+question)));
 
             cudaMemcpy(dev_answerVector, answerVector, sizeof(long)*size_answerVector, cudaMemcpyHostToDevice);
             cudaMemcpy(dev_defineword, *(questionArray+question), sizeof(*(questionArray+question)), cudaMemcpyHostToDevice);
+            //printf("iteration at question : %s\n", *(questionArray+question));
 
-            cuda_stringsearch<<<4,1024>>>(startpoint, endpoint, dev_defineword, dev_buffer, dev_countPTR, overflowStringSize, dev_answerVector);
+            cuda_stringsearch<<<NumberOfComputeBlock,NumberOfThreadsPerBlock>>>(startpoint, endpoint, dev_defineword, dev_buffer, dev_countPTR, overflowStringSize, dev_answerVector);
+            cudaDeviceSynchronize();
+            cudaMemcpy (answerVector, dev_answerVector, sizeof(long)*size_answerVector, cudaMemcpyDeviceToHost);
 
+            cudaFree(dev_answerVector);
+            cudaFree(dev_defineword);
 
+            //readVector(answerVector, size_answerVector);
+            long iterationsum =  sumVector(answerVector, size_answerVector);
+
+            *(questionAnswer+question) += iterationsum;
+
+            //printf("iteration at question : %s   founded %ld\n", *(questionArray+question),  iterationsum);
+            free(answerVector);
         }
 
 
         gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
 
-        //cudaMemcpy (buffer, dev_buffer,sizeof(char)*(threadchucksize + overflowStringSize),cudaMemcpyDeviceToHost);
+        cudaMemcpy (buffer, dev_buffer,sizeof(char)*(threadchucksize + overflowStringSize),cudaMemcpyDeviceToHost);
         //cudaMemcpy (countPTR, dev_countPTR, sizeof(int), cudaMemcpyDeviceToHost);
-        cudaMemcpy (answerVector, dev_answerVector, sizeof(long)*size_answerVector, cudaMemcpyDeviceToHost);
-        cudaFree(dev_buffer); cudaFree(dev_countPTR); cudaFree(dev_defineword);
-        cudaFree(dev_answerVector);
-/*
-        for (int i = 0; i < 1000; ++i) {
-            cuda_stringsearch(startpoint, endpoint, DefineWord, buffer, countPTR, overflowStringSize);
-        }
+        cudaFree(dev_buffer); cudaFree(dev_countPTR);
 
-        printf("---------Buffer after changed----------------------------------------------------------------\n");
+        printf("---------saveing change buffered----------------------------------------------------------------\n");
         endpoint = threadchucksize - 1;
         if (endpoint > BufferSize)
             endpoint = BufferSize;
-        printf("startpoint : %ld     endpoint : %ld   BufferSize : %ld \n", startpoint, endpoint, BufferSize);
+        //printf("startpoint : %ld     endpoint : %ld   BufferSize : %ld \n", startpoint, endpoint, BufferSize);
         for (int i=startpoint;i <= endpoint; i++) {
-            printf("%c", *(buffer + i));
-            if (*(buffer + i) != '\0')
+            if (*(buffer + i) != '\0' && *(buffer + i) != '$' )
                 fprintf(outputFile, "%c", *(buffer + i));
+            //printf("%c", *(buffer + i));
         }
         printf("\n");
 
-
         printf("-------------------------------------------------------------------------------------------\n");
-*/
-        //fprintf(outputFile, "%s",buffer);
-        readVector(answerVector, size_answerVector);
-        long iterationsum =  sumVector(answerVector, size_answerVector);
 
-        count += iterationsum;
-        printf("iteration count : %ld   all count %d\n", iterationsum, count);
+        //fprintf(outputFile, "%s",buffer);
+
         BufferSize = BufferSize - threadchucksize;
 
         free(buffer);
         if (BufferSize <= 0)
             break;
     }
-    printf("all count : %d \n", count);
+    for (int k = 1; k <= questionCount; ++k) {
+        printf("element at : %d is : %s value is : %lu\n",  k, *(questionArray+k), *(questionAnswer+k));
+    }
     fclose (pFile);
     fclose (outputFile);
     return EXIT_SUCCESS;

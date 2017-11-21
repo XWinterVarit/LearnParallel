@@ -5,7 +5,7 @@
 
 int NUM_THREADS = 4;
 char FileName[] = "a.txt";
-char QuestionFileName[] = "line1";
+char QuestionFileName[] = "q.txt";
 char OutputFileName[] = "b.txt";
 char DefineWord[] = "Cat";
 long threadchucksize = 50; // Warning : Must larger than one word, if not, infinity loop begin!
@@ -187,10 +187,11 @@ int main(int argc, char **argv) {
 
     //printf("%s\n", Question_Buffer);
 
+
     long start = 0, end = 0;
     int Question_maxLength = 0;
     char** questionArray = (char**) malloc(sizeof(char*)*2048);
-    long** questionAnswer = (long**) malloc(sizeof(long*)*2048);
+    long* questionAnswer = (long*) malloc(sizeof(long)*2048);
 
     int questionCount = 0;
     for (int j = 0; j <= strlen(Question_Buffer); ++j) {
@@ -201,6 +202,7 @@ int main(int argc, char **argv) {
             //memcpy(piece, (Question_Buffer+start), end - start - 1);
             *(questionArray+questionCount) = (char*) malloc(sizeof(char)*2048);
             memcpy(*(questionArray+questionCount), (Question_Buffer+start), end - start - 1);
+            *(questionAnswer+questionCount) = 0;
             if (strlen(*(questionArray+questionCount)) > Question_maxLength)
                 Question_maxLength = strlen(*(questionArray+questionCount));
             //printf("print piece %s|||\n", *(questionArray+questionCount));
@@ -209,6 +211,11 @@ int main(int argc, char **argv) {
 
         }
     }
+
+    for (int k = 1; k <= questionCount; ++k) {
+        printf("element at : %d is : %s value is : \n",  k, *(questionArray+k));
+    }
+
     printf("Question max length : %d\n", Question_maxLength);
     printf("Question elements count : %d\n", questionCount);
     free(Question_Buffer);
