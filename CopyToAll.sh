@@ -8,5 +8,8 @@
 
 
 
-docker cp MultiplicationOpenMp.c dockeropenmpi_mpi_head_1:/home/mpirun/MultiplicationOpenMp.c
-docker cp MultiplicationSeq.c dockeropenmpi_mpi_head_1:/home/mpirun/MultiplicationSeq.c
+#docker cp MultiplicationOpenMp.c dockeropenmpi_mpi_head_1:/home/mpirun/MultiplicationOpenMp.c
+#docker cp MultiplicationSeq.c dockeropenmpi_mpi_head_1:/home/mpirun/MultiplicationSeq.c
+
+
+scp -r ./Countword/ cheevarit@158.108.38.91:~/ -P 55555
