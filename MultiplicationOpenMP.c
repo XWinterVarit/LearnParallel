@@ -73,7 +73,7 @@ int* multiplication_Matrix (int* matrixA,int matrixA_rowsize, int matrixA_column
     {
         id = omp_get_thread_num();
         threads = omp_get_num_threads();
-        #pragma omp for schedule(dynamic,1)
+        #pragma omp for schedule(static)
             for (int inrow = 0; inrow < matrixAnswer_rowsize; inrow++) {
                 #pragma omp atomic write
                     progress = progress + 1;

@@ -68,10 +68,11 @@ __global__ void multiplication_Matrix (int *matrixA, int *matrixB, int *matrixC,
 }
 
 int main() {
-    int matrixA_rowsize = 10000;
-    int matrixA_columnsize = 10000;
-    int matrixB_rowsize = 10000;
-    int matrixB_columnsize = 10000;
+    time_t timestart = time(NULL);
+    int matrixA_rowsize = 1000;
+    int matrixA_columnsize = 1000;
+    int matrixB_rowsize = 1000;
+    int matrixB_columnsize = 1000;
     int matrixC_rowsize = matrixA_rowsize;
     int matrixC_columnsize = matrixB_columnsize;
 
@@ -92,7 +93,7 @@ int main() {
     //printMatrixM(MatrixA,matrixA_rowsize, matrixA_columnsize);
     //printMatrixM(MatrixB,matrixB_rowsize, matrixB_columnsize);
 
-
+    printf("Generate value completed!\n");
     int *dev_MatrixA, *dev_MatrixB, *dev_MatrixC;
     int size_MatrixA = matrixA_rowsize * matrixA_columnsize * sizeof(int);
     int size_MatrixB = matrixB_rowsize * matrixB_columnsize * sizeof(int);
@@ -123,7 +124,9 @@ int main() {
     //printMatrixM(MatrixB,matrixB_rowsize, matrixB_columnsize);
 
     //printMatrixM(MatrixC,matrixC_rowsize, matrixC_columnsize);
-    printf("Calulate completed");
+    printf("Calulate completed\n");
+    printf("\nestimate using time : %.5f\n", (double)(time(NULL) - timestart));
+
 }
 
 __global__ void matrixAdd (int *a, int *b, int *c) {

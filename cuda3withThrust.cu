@@ -4,6 +4,9 @@
 #include <string.h>
 #include <time.h>
 
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+
 #define BLOCKDIM 1024
 /*
 #include <thrust/device_vector.h>
@@ -130,17 +133,17 @@ __device__ unsigned int string_search_rr(long start, long end, char* target, cha
             }
 
         } else {
-	    // if you want to search word in any file (not only file that contain one line per word. please comment this block)
-	    //
-	    int j = 0;
- 	    for (j = i; j <= end; j++) {
-	    	if (*(buffer+j) == '\n')
-	 	    break;
-	    }
-	    i = j;
-	    //
-	    //-----------------------------------------------------------------------------------------------------------------
-	}
+            // if you want to search word in any file (not only file that contain one line per word. please comment this block)
+            //
+            int j = 0;
+            for (j = i; j <= end; j++) {
+                if (*(buffer+j) == '\n')
+                    break;
+            }
+            i = j;
+            //
+            //-----------------------------------------------------------------------------------------------------------------
+        }
 
     }
 
@@ -149,14 +152,14 @@ __device__ unsigned int string_search_rr(long start, long end, char* target, cha
 __global__ void cuda_stringsearch (long bufferstart, long bufferend, char* target, char* buffer, int* allcount, int overflowStringSize, long *answerVector, char* changebuffer) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     //printf("hello from thread %d\n", index);
-/*  
+/*
   if (index == 1) {
         printf("GPU KERNEL :: Hello from threads %d  Given word %s  size %d \n", index, target, d_strlen(target));
     }
 */
     //printf("Hello from threads %d  Given word %s\n", index, target);
 
-   // long blocksize = 500/*50000*/;
+    // long blocksize = 500/*50000*/;
     long extendblocksize = blocksize + overflowStringSize - 2;
     long startpoint = index * blocksize;
     long endpoint = startpoint + blocksize  - 1;
@@ -316,11 +319,11 @@ int main(int argc, char **argv) {
         cudaMemcpy(dev_countPTR, countPTR, sizeof(int),cudaMemcpyHostToDevice);
 
         for (int question = 1; question <= questionCount - 1; ++question) {
-        //int question = 1;
+            //int question = 1;
             long size_answerVector = sizeofAnswerVector;
             long* answerVector = createVector(size_answerVector,0);
-	    char *dev_defineword;
-	    long *dev_answerVector;
+            char *dev_defineword;
+            long *dev_answerVector;
 
 //	    printf("HOST :: starting iteration %d at question : %s  string length : %zu\n",question, *(questionArray+question),  strlen(*(questionArray+question)));
 /*		for (int d = 0; d < strlen(*(questionArray+question)); d++) {
@@ -340,11 +343,15 @@ int main(int argc, char **argv) {
 
             cudaFree(dev_answerVector);
             cudaFree(dev_defineword);
-	    
-            //readVector(answerVector, size_answerVector); //uncomment this to diagnostic answer vector matrix
-            long iterationsum =  sumVector(answerVector, size_answerVector);
 
-            *(questionAnswer+question) += iterationsum;
+            //readVector(answerVector, size_answerVector); //uncomment this to diagnostic answer vector matrix
+            //long iterationsum =  sumVector(answerVector, size_answerVector);
+            thrust::device_vector<long> d_ansV(size_answerVector,0);
+            for (int f = 0; f < size_answerVector; f++) {
+                d_ansV[f] = *(answerVector + f);
+            }
+            long iterationsum = thrust::reduce(d_ansV.begin(), d_ansV.end(),(long) 0, thrust::plus<long>());
+            *(questionAnswer+question) += iterationsum;;
 
             printf("HOST :: Finish iteration %d at question : %s  temporary founded %ld\n\n",question, *(questionArray+question),  iterationsum);
             free(answerVector);

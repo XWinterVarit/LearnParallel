@@ -6,15 +6,30 @@
 #include <thrust/device_vector.h>
 #include <string.h>
 #include <iostream>
-struct changer{
-    const int a;
+#include <stdlib.h>
+#include <stdio.h>
 
-    changer(int _a) : a(_a) {}
-    __host__ __device__
-    int operator() (const float& x) const {
-        return a*x;
+
+long* createVector (long size, long inivalue) {
+    long* vector = (long*) malloc(sizeof(long)*size);
+    for (long i = 0; i < size; ++i) {
+        vector[i] = inivalue;
     }
-};
+    return vector;
+}
+void readVector (long* vector, long size) {
+    for (long i = 0; i < size; ++i) {
+        printf("%ld ",vector[i]);
+    }
+    printf("\n");
+}
+long sumVector (long* vector, long size) {
+    long sum = 0;
+    for (long i = 0; i < size; ++i) {
+        sum+= vector[i];
+    }
+    return sum;
+}
 int main(void)
 {
    /*
@@ -26,14 +41,15 @@ int main(void)
             "  Then the bird said, `Nevermore.'\n";
     thrust::device_vector<char> input(raw_input, raw_input + sizeof(raw_input));
 */
-    int a[] = {1,2,3,4,5,6,7,8,9};
-    thrust::device_vector<int> dev_a(a, a+9);
-    thrust::transform(dev_a.begin(), dev_a.end(), dev_a.begin(), changer(5));
-    thrust::host_vector<int> hos_a = dev_a;
-    for (int i = 0; i < hos_a.size(); ++i) {
-        printf("%d ", hos_a[i]);
+    long* test= createVector(10,2);
+    readVector(test,10);
+    thrust::device_vector<long> d_test(10,0);
+    for (int i = 0; i < 10; i++) {
+        d_test[i] = *(test + i);
     }
-    printf("\n");
+    long sum = thrust::reduce(d_test.begin(), d_test.end(),(int) 0, thrust::plus<int>());
+    printf("sum : %lu\n", sum);
+
     //printf("%s\n",a);
     return 0;
 }
