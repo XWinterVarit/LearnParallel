@@ -110,10 +110,10 @@ int main (int argc, char *argv[])
     int nthreads, tid;
 
 
-    int matrixA_rowsize = 2000;
-    int matrixA_columnsize = 2000;
-    int matrixB_rowsize = 2000;
-    int matrixB_columnsize = 2000;
+    int matrixA_rowsize = 10000;
+    int matrixA_columnsize = 10000;
+    int matrixB_rowsize = 10000;
+    int matrixB_columnsize = 10000;
     int matrixAnswer_rowsize = matrixA_rowsize;
     int matrixAnswer_columnsize = matrixB_columnsize;
 

@@ -4,7 +4,15 @@
 #include <math.h>
 
 #define BLOCK_DIM 32
-
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
 
 
 __global__ void matrixAdd (int *a, int *b, int *c);
@@ -69,10 +77,10 @@ __global__ void multiplication_Matrix (int *matrixA, int *matrixB, int *matrixC,
 
 int main() {
     time_t timestart = time(NULL);
-    int matrixA_rowsize = 1000;
-    int matrixA_columnsize = 1000;
-    int matrixB_rowsize = 1000;
-    int matrixB_columnsize = 1000;
+    int matrixA_rowsize = 10000;
+    int matrixA_columnsize = 10000;
+    int matrixB_rowsize = 10000;
+    int matrixB_columnsize = 10000;
     int matrixC_rowsize = matrixA_rowsize;
     int matrixC_columnsize = matrixB_columnsize;
 
@@ -112,6 +120,9 @@ int main() {
     printf("block per grid is : %d , %d\n", (int)ceil((matrixC_rowsize*1.0)/dimBlock.x),(int)ceil((matrixC_columnsize*1.0)/dimBlock.y));
 
     multiplication_Matrix<<<dimGrid, dimBlock>>>(dev_MatrixA, dev_MatrixB, dev_MatrixC, matrixA_rowsize, matrixA_columnsize, matrixB_rowsize, matrixB_columnsize);
+    cudaDeviceSynchronize();
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
 
     //cudaMemcpy (MatrixA, dev_MatrixA, size, cudaMemcpyDeviceToHost);
     //cudaMemcpy (MatrixB, dev_MatrixB, size, cudaMemcpyDeviceToHost);
